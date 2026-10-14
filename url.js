@@ -5,7 +5,8 @@
  */
 export const DEFAULT_PREFERENCES = Object.freeze({
   hideWhitespace: true,
-  hideViewedFiles: true
+  hideViewedFiles: true,
+  autoViewImportOnly: false
 });
 
 export function getChangesUrlWithPreferences(rawUrl, preferences = DEFAULT_PREFERENCES) {

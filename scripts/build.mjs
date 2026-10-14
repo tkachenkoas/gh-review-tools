@@ -11,6 +11,8 @@ const files = [
   "popup.js",
   "url.js",
   "url-watcher.js",
+  "import-only.js",
+  "viewed-files.js",
   "assets/icons"
 ];
 

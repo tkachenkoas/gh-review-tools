@@ -2,7 +2,8 @@ import { DEFAULT_PREFERENCES } from "./url.js";
 
 const controls = {
   hideWhitespace: document.querySelector("#hide-whitespace"),
-  hideViewedFiles: document.querySelector("#hide-viewed-files")
+  hideViewedFiles: document.querySelector("#hide-viewed-files"),
+  autoViewImportOnly: document.querySelector("#auto-view-import-only")
 };
 
 await loadPreferences();
