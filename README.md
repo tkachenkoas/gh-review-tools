@@ -56,6 +56,18 @@ npm run build
 The unpacked distributable is written to `dist/`. GitHub Actions additionally
 uploads this folder for every CI run and builds a ZIP for every `v*` tag.
 
+## Release
+
+Bump `version` in `manifest.json` and `package.json`, merge, then push a
+matching tag (`git tag v1.2.0 && git push origin v1.2.0`). The release workflow
+attaches the ZIP to a GitHub Release, uploads it to the Chrome Web Store and
+submits it for review. It needs these repository secrets:
+
+- `GCP_SA_KEY`: JSON key of a service account added in the Developer Dashboard
+  account settings, in a project with the Chrome Web Store API enabled.
+- `CWS_PUBLISHER_ID`: publisher ID from the Developer Dashboard account settings.
+- `CWS_EXTENSION_ID`: the extension's item ID.
+
 ## Privacy
 
 See [PRIVACY.md](PRIVACY.md). The extension does not collect or transmit

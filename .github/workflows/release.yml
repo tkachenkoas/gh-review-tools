@@ -17,6 +17,13 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Check tag matches manifest version
+        run: |
+          version=$(node -p 'require("./manifest.json").version')
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match manifest version ${version}"
+            exit 1
+          fi
       - run: npm ci
       - run: npm run validate
       - name: Create ZIP
@@ -27,3 +34,33 @@ jobs:
         with:
           generate_release_notes: true
           files: github-diff-defaults-${{ github.ref_name }}.zip
+      - uses: google-github-actions/auth@v2
+        id: auth
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+      - name: Publish to Chrome Web Store
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          ITEM: publishers/${{ secrets.CWS_PUBLISHER_ID }}/items/${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          api=https://chromewebstore.googleapis.com
+          state=$(curl -fsS -X POST -H "Authorization: Bearer $TOKEN" \
+            -T "github-diff-defaults-${GITHUB_REF_NAME}.zip" \
+            "$api/upload/v2/$ITEM:upload" | jq -r '.uploadState')
+          echo "Upload state: $state"
+
+          # The store may process the package asynchronously; wait for it.
+          for _ in $(seq 30); do
+            case "$state" in IN_PROGRESS|UPLOAD_IN_PROGRESS) ;; *) break ;; esac
+            sleep 10
+            state=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$api/v2/$ITEM:fetchStatus" | jq -r '.lastAsyncUploadState')
+            echo "Upload state: $state"
+          done
+          if [ "$state" != "SUCCEEDED" ]; then
+            echo "::error::Chrome Web Store upload ended in state $state"
+            exit 1
+          fi
+
+          curl -fsS -X POST -H "Authorization: Bearer $TOKEN" "$api/v2/$ITEM:publish"
