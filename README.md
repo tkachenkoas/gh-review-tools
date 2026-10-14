@@ -61,11 +61,36 @@ uploads this folder for every CI run and builds a ZIP for every `v*` tag.
 Bump `version` in `manifest.json` and `package.json`, merge, then push a
 matching tag (`git tag v1.2.0 && git push origin v1.2.0`). The release workflow
 attaches the ZIP to a GitHub Release, uploads it to the Chrome Web Store and
-submits it for review. It needs these repository secrets:
+submits it for review. Google's review usually takes from a few hours to a
+couple of days; the store rejects a version it has already received.
 
-- `GCP_SA_KEY`: JSON key of a service account added in the Developer Dashboard
-  account settings, in a project with the Chrome Web Store API enabled.
-- `CWS_PUBLISHER_ID`: publisher ID from the Developer Dashboard account settings.
+If the Chrome Web Store step fails after the GitHub Release was created, fix the
+cause and re-run the failed job (`gh run rerun <run-id> --failed`); there is no
+need to recreate the tag.
+
+### One-time setup
+
+The API only updates an existing item, so the very first version is uploaded by
+hand in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
+Then, in the Google Cloud project `chrome-extensions-511619`:
+
+1. Enable the
+   [Chrome Web Store API](https://console.cloud.google.com/apis/library/chromewebstore.googleapis.com)
+   and the
+   [IAM Service Account Credentials API](https://console.cloud.google.com/apis/library/iamcredentials.googleapis.com);
+   the latter is what `google-github-actions/auth` uses to mint the access token.
+2. Create a service account (`cws-publisher`) and download a JSON key for it.
+3. Grant that service account **Service Account Token Creator**; without it the
+   auth step fails with `iam.serviceAccounts.getAccessToken denied`. New IAM
+   grants can take a few minutes to apply.
+4. Add the service account's email in the Developer Dashboard under Account →
+   Service account.
+
+Repository secrets:
+
+- `GCP_SA_KEY`: the service account's JSON key.
+- `CWS_PUBLISHER_ID`: the publisher ID, the UUID in Developer Dashboard URLs
+  (`devconsole/<publisher-id>/<extension-id>/...`).
 - `CWS_EXTENSION_ID`: the extension's item ID.
 
 ## Privacy
