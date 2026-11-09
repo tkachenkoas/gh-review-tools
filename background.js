@@ -1,4 +1,4 @@
-import { DEFAULT_PREFERENCES, getChangesUrlWithPreferences } from "./url.js";
+import { getChangesUrlWithPreferences } from "./url.js";
 
 const githubFilter = { url: [{ hostEquals: "github.com" }] };
 
@@ -39,7 +39,7 @@ async function applyPreferencesToTab(tabId) {
 }
 
 async function applyPreferencesToUrl(tabId, url) {
-  const preferences = await chrome.storage.sync.get(DEFAULT_PREFERENCES);
+  const preferences = await chrome.storage.sync.get(["hideWhitespace", "hideViewedFiles"]);
   const targetUrl = getChangesUrlWithPreferences(url, preferences);
 
   if (targetUrl) {

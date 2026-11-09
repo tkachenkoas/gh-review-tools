@@ -4,12 +4,13 @@
  * already normalized.
  */
 export const DEFAULT_PREFERENCES = Object.freeze({
-  hideWhitespace: true,
-  hideViewedFiles: true,
-  autoViewImportOnly: false
+  hideWhitespace: false,
+  hideViewedFiles: false,
+  autoViewImportOnly: false,
+  autoViewUnchangedRenames: false
 });
 
-export function getChangesUrlWithPreferences(rawUrl, preferences = DEFAULT_PREFERENCES) {
+export function getChangesUrlWithPreferences(rawUrl, preferences = {}) {
   let url;
 
   try {
@@ -54,7 +55,7 @@ function applyPreference(url, name, value, enabled) {
     return true;
   }
 
-  if (!url.searchParams.has(name)) {
+  if (enabled !== false || !url.searchParams.has(name)) {
     return false;
   }
 

@@ -1,23 +1,31 @@
 // Speeds up marking files as viewed on a PR Changes page:
 // - "v" marks the first not-viewed file visible on screen;
-// - optionally, import-only files are marked automatically, one per second.
+// - optionally, import-only files and unchanged renames are marked one per second.
 const VIEWED_BUTTON = 'button[aria-pressed][aria-label="Viewed"], button[aria-pressed][aria-label="Not Viewed"]';
 // The sticky PR toolbar covers the top of the viewport; a file whose bottom is
 // above this line is no longer readable, so the hotkey skips it.
 const STICKY_TOOLBAR_HEIGHT = 120;
 const AUTO_VIEW_INTERVAL_MS = 1000;
 
-let autoViewImportOnly = false;
+let autoViewImportOnly;
+let autoViewUnchangedRenames;
 // Files already auto-marked on this page; unmarking one by hand must stick.
 const autoViewedFileIds = new Set();
 
-chrome.storage.sync.get({ autoViewImportOnly: false }).then((preferences) => {
-  autoViewImportOnly = preferences.autoViewImportOnly;
-});
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.autoViewImportOnly) {
-    autoViewImportOnly = changes.autoViewImportOnly.newValue;
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "sync") {
+    return;
   }
+  if (changes.autoViewImportOnly) {
+    autoViewImportOnly = changes.autoViewImportOnly.newValue === true;
+  }
+  if (changes.autoViewUnchangedRenames) {
+    autoViewUnchangedRenames = changes.autoViewUnchangedRenames.newValue === true;
+  }
+});
+chrome.storage.sync.get(["autoViewImportOnly", "autoViewUnchangedRenames"]).then((preferences) => {
+  autoViewImportOnly ??= preferences.autoViewImportOnly === true;
+  autoViewUnchangedRenames ??= preferences.autoViewUnchangedRenames === true;
 });
 
 document.addEventListener("keydown", (event) => {
@@ -33,11 +41,18 @@ document.addEventListener("keydown", (event) => {
 });
 
 setInterval(() => {
-  if (!autoViewImportOnly) {
+  if (!autoViewImportOnly && !autoViewUnchangedRenames) {
     return;
   }
 
-  const file = notViewedFiles().find((region) => !autoViewedFileIds.has(region.id) && isImportOnlyFile(region));
+  const file = notViewedFiles().find((region) => {
+    const button = viewedButton(region);
+    return !autoViewedFileIds.has(region.id) &&
+      !button.disabled &&
+      button.getAttribute("data-loading") !== "true" &&
+      ((autoViewUnchangedRenames && isUnchangedRename(region)) ||
+        (autoViewImportOnly && isImportOnlyFile(region)));
+  });
   if (file) {
     autoViewedFileIds.add(file.id);
     viewedButton(file).click();
@@ -45,7 +60,7 @@ setInterval(() => {
 }, AUTO_VIEW_INTERVAL_MS);
 
 function notViewedFiles() {
-  if (!/^\/[^/]+\/[^/]+\/pull\/\d+\/(changes|files)$/.test(location.pathname)) {
+  if (!/^\/[^/]+\/[^/]+\/pull\/\d+\/(changes|files)\/?$/.test(location.pathname)) {
     return [];
   }
 
@@ -55,6 +70,12 @@ function notViewedFiles() {
 
 function viewedButton(region) {
   return region.querySelector(VIEWED_BUTTON);
+}
+
+function isUnchangedRename(region) {
+  return [...region.querySelectorAll("div[data-diff-anchor]")].some(
+    (notice) => notice.textContent.trim() === "File renamed without changes."
+  );
 }
 
 // GitHub renders file diffs lazily; only a file whose lines are already in the
