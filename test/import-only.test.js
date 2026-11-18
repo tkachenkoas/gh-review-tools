@@ -16,6 +16,17 @@ test("isImportOnlyChange_jsAndPythonImports_true", () => {
   assert.equal(isImportOnlyChange(['import { a } from "./a.js";', "from os import path", "import sys"]), true);
 });
 
+test("isImportOnlyChange_javaPackageMove_true", () => {
+  assert.equal(
+    isImportOnlyChange(["package com.acme.old;", "package com.acme.moved;", "import com.acme.old.Widget;"]),
+    true
+  );
+});
+
+test("isImportOnlyChange_identifierStartingWithPackage_false", () => {
+  assert.equal(isImportOnlyChange(["packageName = load();"]), false);
+});
+
 test("isImportOnlyChange_importNextToCode_false", () => {
   assert.equal(isImportOnlyChange(["import com.acme.Widget;", "    widget.run();"]), false);
 });
