@@ -61,15 +61,22 @@ uploads this folder for every CI run and builds a ZIP for every `v*` tag.
 
 ## Release
 
-Bump `version` in `manifest.json` and `package.json`, merge, then push a
-matching tag (`git tag v1.2.0 && git push origin v1.2.0`). The release workflow
-attaches the ZIP to a GitHub Release, uploads it to the Chrome Web Store and
-submits it for review. Google's review usually takes from a few hours to a
-couple of days; the store rejects a version it has already received.
+Every update to `main`, including a PR merge, runs the release workflow. Use a
+Conventional Commit title when merging a PR. The workflow uses the highest
+applicable bump across the incoming commits:
+
+- `feat!:` or a `BREAKING CHANGE:` footer increments the major version.
+- `feat:` increments the minor version.
+- `fix:`, other types, and plain titles increment the patch version.
+
+The workflow sets the version in the build, tags the source commit, attaches
+the ZIP to a GitHub Release, and submits it to the Chrome Web Store for review.
+Google's review usually takes a few days.
 
 If the Chrome Web Store step fails after the GitHub Release was created, fix the
-cause and re-run the failed job (`gh run rerun <run-id> --failed`); there is no
-need to recreate the tag.
+cause and re-run the failed job (`gh run rerun <run-id> --failed`). The job uses
+the same version on retry. To run the workflow for the current `main` manually,
+use `gh workflow run release.yml --ref main`.
 
 ### One-time setup
 
