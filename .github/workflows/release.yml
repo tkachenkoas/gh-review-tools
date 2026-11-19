@@ -2,38 +2,56 @@ name: Release extension
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: extension-release
+  queue: max
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: Check tag matches manifest version
+      - name: Set release version
+        id: version
         run: |
-          version=$(node -p 'require("./manifest.json").version')
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match manifest version ${version}"
-            exit 1
-          fi
+          tag=$(node scripts/release-version.mjs)
+          version=${tag#v}
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=github-diff-defaults-$tag.zip" >> "$GITHUB_OUTPUT"
+          npm version "$version" --no-git-tag-version --allow-same-version
+          jq --arg version "$version" '.version = $version' manifest.json > manifest.release.json
+          mv manifest.release.json manifest.json
       - run: npm ci
       - run: npm run validate
       - name: Create ZIP
+        env:
+          ARCHIVE: ${{ steps.version.outputs.archive }}
         run: |
           cd dist
-          zip -r "../github-diff-defaults-${GITHUB_REF_NAME}.zip" .
+          zip -r "../$ARCHIVE" .
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
-          files: github-diff-defaults-${{ github.ref_name }}.zip
+          files: ${{ steps.version.outputs.archive }}
+          fail_on_unmatched_files: true
       - uses: google-github-actions/auth@v2
         id: auth
         with:
@@ -44,18 +62,34 @@ jobs:
         env:
           TOKEN: ${{ steps.auth.outputs.access_token }}
           ITEM: publishers/${{ secrets.CWS_PUBLISHER_ID }}/items/${{ secrets.CWS_EXTENSION_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCHIVE: ${{ steps.version.outputs.archive }}
         run: |
           api=https://chromewebstore.googleapis.com
-          state=$(curl -fsS -X POST -H "Authorization: Bearer $TOKEN" \
-            -T "github-diff-defaults-${GITHUB_REF_NAME}.zip" \
-            "$api/upload/v2/$ITEM:upload" | jq -r '.uploadState')
+          status_url="$api/v2/$ITEM:fetchStatus"
+          status=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$status_url")
+          active_versions=$(jq -r '
+            [.publishedItemRevisionStatus, .submittedItemRevisionStatus][]
+            | select(.state == "PUBLISHED" or .state == "PENDING_REVIEW" or .state == "STAGED" or .state == "PUBLISHED_TO_TESTERS")
+            | .distributionChannels[]?.crxVersion
+          ' <<< "$status")
+          newest_version=$(printf '%s\n%s\n' "$active_versions" "$VERSION" | sort -V | tail -n 1)
+          if [ "$newest_version" != "$VERSION" ] || grep -Fxq "$VERSION" <<< "$active_versions"; then
+            echo "Chrome Web Store already has version $VERSION or a newer active version."
+            exit 0
+          fi
+
+          upload=$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $TOKEN" \
+            -T "$ARCHIVE" "$api/upload/v2/$ITEM:upload") || { echo "$upload"; exit 1; }
+          state=$(jq -r '.uploadState' <<< "$upload")
           echo "Upload state: $state"
 
           # The store may process the package asynchronously; wait for it.
           for _ in $(seq 30); do
             case "$state" in IN_PROGRESS|UPLOAD_IN_PROGRESS) ;; *) break ;; esac
             sleep 10
-            state=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$api/v2/$ITEM:fetchStatus" | jq -r '.lastAsyncUploadState')
+            status=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$status_url")
+            state=$(jq -r '.lastAsyncUploadState' <<< "$status")
             echo "Upload state: $state"
           done
           if [ "$state" != "SUCCEEDED" ]; then
@@ -63,4 +97,4 @@ jobs:
             exit 1
           fi
 
-          curl -fsS -X POST -H "Authorization: Bearer $TOKEN" "$api/v2/$ITEM:publish"
+          curl --fail-with-body -sS -X POST -H "Authorization: Bearer $TOKEN" "$api/v2/$ITEM:publish"

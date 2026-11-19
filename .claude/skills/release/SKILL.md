@@ -5,24 +5,17 @@ description: Release a new version of the extension to GitHub Releases and the C
 
 # Release
 
-A pushed `v*` tag runs `.github/workflows/release.yml`: it builds the ZIP,
-attaches it to a GitHub Release, uploads it to the Chrome Web Store and submits
-it for review. Setup and secrets are described in the README's Release section.
+Updates to `main` run `.github/workflows/release.yml`. It computes the version
+from Conventional Commits, builds the ZIP, creates the tag and GitHub Release,
+and submits the ZIP to the Chrome Web Store. The README describes version bumps,
+setup and secrets.
 
 ## Steps
 
-1. Pick the new version (ask if the user didn't say). It must be higher than the
-   version already in the store; the store rejects a repeat.
-2. Bump `version` in both `manifest.json` and `package.json`, open a PR, merge
-   it once CI passes.
-3. Tag the merge commit on `main` and push the tag:
-
-   ```bash
-   git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
-   ```
-
-   The workflow fails before uploading if the tag doesn't match the manifest.
-4. Watch the run and report the store's answer:
+1. Find the release run for the merge commit. To retry a failed run, use
+   `gh run rerun <run-id> --failed`. If there is no run for the current tip of
+   `main`, start one with `gh workflow run release.yml --ref main`.
+2. Watch the run and report the store's answer:
 
    ```bash
    gh run list --workflow release.yml --limit 1
