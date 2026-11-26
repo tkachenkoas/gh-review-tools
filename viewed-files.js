@@ -1,11 +1,18 @@
 // Speeds up marking files as viewed on a PR Changes page:
-// - "v" marks the first not-viewed file visible on screen;
+// - "v" marks the first not-viewed file visible on screen and scrolls to the next not-viewed one;
 // - optionally, import-only files and unchanged renames are marked one per second.
 const VIEWED_BUTTON = 'button[aria-pressed][aria-label="Viewed"], button[aria-pressed][aria-label="Not Viewed"]';
 // The sticky PR toolbar covers the top of the viewport; a file whose bottom is
 // above this line is no longer readable, so the hotkey skips it.
 const STICKY_TOOLBAR_HEIGHT = 120;
 const AUTO_VIEW_INTERVAL_MS = 1000;
+// GitHub renders only the files near the viewport, so the next not-viewed file
+// is found by scrolling one rendered screen at a time and waiting for the render.
+const SCROLL_RENDER_WAIT_MS = 150;
+const MAX_SCROLL_STEPS = 100;
+
+// A newer "v" press takes over the scroll of the previous one.
+let scrollRun = 0;
 
 let autoViewImportOnly;
 let autoViewUnchangedRenames;
@@ -37,8 +44,36 @@ document.addEventListener("keydown", (event) => {
   if (file) {
     event.preventDefault();
     viewedButton(file).click();
+    scrollToNextNotViewedFile(file.id);
   }
 });
+
+async function scrollToNextNotViewedFile(markedFileId) {
+  const run = ++scrollRun;
+  for (let step = 0; step < MAX_SCROLL_STEPS; step++) {
+    await new Promise((resolve) => setTimeout(resolve, SCROLL_RENDER_WAIT_MS));
+    if (run !== scrollRun) {
+      return;
+    }
+
+    const next = notViewedFiles().find(
+      (region) => region.id !== markedFileId && region.getBoundingClientRect().bottom > STICKY_TOOLBAR_HEIGHT
+    );
+    if (next) {
+      scrollBy(0, next.getBoundingClientRect().top - STICKY_TOOLBAR_HEIGHT);
+      return;
+    }
+
+    const lastRendered = diffFiles().at(-1);
+    const scrolledFrom = scrollY;
+    if (lastRendered) {
+      scrollBy(0, lastRendered.getBoundingClientRect().top - STICKY_TOOLBAR_HEIGHT);
+    }
+    if (scrollY === scrolledFrom) {
+      return;
+    }
+  }
+}
 
 setInterval(() => {
   if (!autoViewImportOnly && !autoViewUnchangedRenames) {
@@ -59,13 +94,16 @@ setInterval(() => {
   }
 }, AUTO_VIEW_INTERVAL_MS);
 
-function notViewedFiles() {
+function diffFiles() {
   if (!/^\/[^/]+\/[^/]+\/pull\/\d+\/(changes|files)\/?$/.test(location.pathname)) {
     return [];
   }
 
-  return [...document.querySelectorAll('div[role="region"][id^="diff-"]')]
-    .filter((region) => viewedButton(region)?.getAttribute("aria-pressed") === "false");
+  return [...document.querySelectorAll('div[role="region"][id^="diff-"]')];
+}
+
+function notViewedFiles() {
+  return diffFiles().filter((region) => viewedButton(region)?.getAttribute("aria-pressed") === "false");
 }
 
 function viewedButton(region) {
