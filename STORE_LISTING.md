@@ -2,16 +2,16 @@
 
 ## Name
 
-GitHub Diff Defaults
+PR Review Tools for GitHub
 
 ## Summary
 
-Apply preferred filters automatically when opening a GitHub pull request's
-Changes tab.
+Review GitHub PRs with saved diff filters, press V to mark files viewed, and
+auto-mark import-only diffs and unchanged renames.
 
 ## Detailed description
 
-GitHub Diff Defaults keeps pull-request review focused by applying your saved
+PR Review Tools for GitHub keeps pull-request review focused by applying your saved
 filter preferences whenever you open the Changes tab.
 
 - Hide whitespace-only changes.

@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-16
 
-GitHub Diff Defaults does not collect, sell, or transmit personal data.
+PR Review Tools for GitHub does not collect, sell, or transmit personal data.
 
 The extension stores review preferences in Chrome Sync. It reads the current
 GitHub URL locally to identify a pull request's Changes page and apply the

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "GitHub Diff Defaults",
-  "description": "Apply saved whitespace and viewed-file filters to GitHub pull request Changes pages, and mark files as viewed faster.",
+  "name": "PR Review Tools for GitHub",
+  "description": "Review GitHub PRs with saved diff filters, press V to mark files viewed, and auto-mark import-only diffs and unchanged renames.",
   "version": "1.1.0",
   "permissions": [
     "storage",
@@ -36,7 +36,7 @@
     }
   ],
   "action": {
-    "default_title": "GitHub Diff Defaults",
+    "default_title": "PR Review Tools for GitHub",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "assets/icons/icon-16.png",
