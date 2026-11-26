@@ -18,8 +18,8 @@ The extension affects only URLs shaped like
 ## Marking files as viewed
 
 - Press `v` on a Changes page to mark the first not-viewed file on screen as
-  viewed. With viewed files hidden, the next file moves up, so `v` can be
-  pressed repeatedly while scrolling.
+  viewed. The page then scrolls to the next not-viewed file, so `v` can be
+  pressed repeatedly to walk through a long pull request.
 - **Auto-mark import-only files as viewed** (off by default) marks files whose
   every changed line is an import.
 - **Auto-mark unchanged renames as viewed** (off by default) marks files GitHub

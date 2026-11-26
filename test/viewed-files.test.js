@@ -110,3 +110,66 @@ test("picks up newly rendered renames only on Changes and Files pages", async ()
   tick();
   assert.equal(rename.button.click.mock.callCount(), 1);
 });
+
+// Lays files out top to bottom and, like GitHub, renders only those near the viewport.
+async function openScrollingPage(layout) {
+  const page = { scrollY: 0 };
+  let keydown;
+  const files = layout.map(({ id, height, viewed }) => {
+    const file = {
+      id,
+      viewed,
+      offset: 0,
+      height,
+      button: { click() { file.viewed = true; file.height = 40; }, getAttribute: () => String(file.viewed) },
+      querySelector: () => file.button,
+      getBoundingClientRect: () => ({ top: file.offset - page.scrollY, bottom: file.offset + file.height - page.scrollY })
+    };
+    return file;
+  });
+  const relayout = () => files.reduce((offset, file) => (file.offset = offset) + file.height, 0);
+  relayout();
+
+  const context = {
+    location: new URL("https://github.com/acme/widgets/pull/42/changes"),
+    document: {
+      addEventListener: (type, listener) => { keydown = listener; },
+      querySelectorAll: () => files.filter((file) => {
+        const { top, bottom } = file.getBoundingClientRect();
+        return bottom > -500 && top < 1500;
+      })
+    },
+    chrome: { storage: { sync: { async get() { return {}; } }, onChanged: { addListener() {} } } },
+    HTMLElement: class {},
+    setInterval() {},
+    setTimeout: (callback) => setImmediate(callback),
+    scrollBy: (x, y) => { context.scrollY = Math.max(0, context.scrollY + y); },
+    scrollY: 0
+  };
+  Object.defineProperty(page, "scrollY", { get: () => context.scrollY });
+  runInNewContext(importOnlySource + "\n" + source, context);
+
+  const press = async () => {
+    keydown({ key: "v", target: null, preventDefault() {} });
+    relayout();
+    for (let i = 0; i < 50; i++) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  };
+  return { files, press, top: (id) => files.find((file) => file.id === id).getBoundingClientRect().top };
+}
+
+test("v scrolls to the next not-viewed file even when it is not rendered yet", async () => {
+  const { files, press, top } = await openScrollingPage([
+    { id: "diff-current", height: 3000, viewed: false },
+    ...Array.from({ length: 60 }, (_, i) => ({ id: `diff-viewed-${i}`, height: 40, viewed: true })),
+    { id: "diff-next", height: 800, viewed: false },
+    { id: "diff-last", height: 800, viewed: false }
+  ]);
+
+  await press();
+
+  assert.equal(files[0].viewed, true);
+  assert.equal(top("diff-next"), 120);
+  assert.equal(files.at(-2).viewed, false);
+});
