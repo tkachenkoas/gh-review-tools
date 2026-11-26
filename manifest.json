@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PR Review Tools for GitHub",
-  "description": "Apply saved whitespace and viewed-file filters to GitHub pull request Changes pages, and mark files as viewed faster.",
+  "description": "Review GitHub PRs with saved diff filters, press V to mark files viewed, and auto-mark import-only diffs and unchanged renames.",
   "version": "1.1.0",
   "permissions": [
     "storage",

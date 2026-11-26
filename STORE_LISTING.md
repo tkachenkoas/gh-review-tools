@@ -6,8 +6,8 @@ PR Review Tools for GitHub
 
 ## Summary
 
-Apply preferred filters automatically when opening a GitHub pull request's
-Changes tab.
+Review GitHub PRs with saved diff filters, press V to mark files viewed, and
+auto-mark import-only diffs and unchanged renames.
 
 ## Detailed description
 
