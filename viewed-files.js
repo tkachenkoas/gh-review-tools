@@ -6,6 +6,9 @@ const VIEWED_BUTTON = 'button[aria-pressed][aria-label="Viewed"], button[aria-pr
 // above this line is no longer readable, so the hotkey skips it.
 const STICKY_TOOLBAR_HEIGHT = 120;
 const AUTO_VIEW_INTERVAL_MS = 1000;
+// Match GitHub's data attributes and retain support for the older classes.
+const CHANGED_LINE = 'code[data-diff-type="addition"], code[data-diff-type="deletion"], code.diff-text.addition, code.diff-text.deletion';
+const CHANGED_LINE_TEXT = '[data-diff-text-inner="true"], .diff-text-inner';
 // GitHub renders only the files near the viewport, so the next not-viewed file
 // is found by scrolling one rendered screen at a time and waiting for the render.
 const SCROLL_RENDER_WAIT_MS = 150;
@@ -123,8 +126,14 @@ function isImportOnlyFile(region) {
     return false;
   }
 
-  const changedLines = [...region.querySelectorAll("code.diff-text.addition, code.diff-text.deletion")]
-    .map((code) => code.querySelector(".diff-text-inner")?.textContent ?? "");
+  const changedLines = [];
+  for (const code of region.querySelectorAll(CHANGED_LINE)) {
+    const text = code.querySelector(CHANGED_LINE_TEXT);
+    if (!text) {
+      return false;
+    }
+    changedLines.push(text.textContent);
+  }
   return isImportOnlyChange(changedLines);
 }
 
