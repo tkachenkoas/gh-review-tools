@@ -1,4 +1,4 @@
-# GitHub Diff Defaults
+# PR Review Tools for GitHub
 
 Chrome extension that applies preferred URL settings whenever a GitHub pull
 request's **Changes** tab opens.

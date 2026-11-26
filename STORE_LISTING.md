@@ -2,7 +2,7 @@
 
 ## Name
 
-GitHub Diff Defaults
+PR Review Tools for GitHub
 
 ## Summary
 
@@ -11,7 +11,7 @@ Changes tab.
 
 ## Detailed description
 
-GitHub Diff Defaults keeps pull-request review focused by applying your saved
+PR Review Tools for GitHub keeps pull-request review focused by applying your saved
 filter preferences whenever you open the Changes tab.
 
 - Hide whitespace-only changes.
