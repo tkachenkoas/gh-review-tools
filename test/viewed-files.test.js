@@ -31,6 +31,17 @@ async function openChangesPage(preferences = {}) {
   return { location, files, scan, tick, storageChanged };
 }
 
+function diffLine(text, { type = "addition", modern = false, hasText = true } = {}) {
+  const codeSelector = modern ? `code[data-diff-type="${type}"]` : `code.diff-text.${type}`;
+  const textSelector = modern ? '[data-diff-text-inner="true"]' : ".diff-text-inner";
+  return {
+    codeSelector,
+    querySelector: (selector) => hasText && selector.split(",").map((item) => item.trim()).includes(textSelector)
+      ? { textContent: text }
+      : null
+  };
+}
+
 function diffFile(id, { notice, changedLines = [], viewed = false, disabled = false } = {}) {
   const button = {
     click: mock.fn(() => { viewed = true; }),
@@ -47,7 +58,8 @@ function diffFile(id, { notice, changedLines = [], viewed = false, disabled = fa
       if (selector === "div[data-diff-anchor]") {
         return notice ? [{ textContent: notice }] : [];
       }
-      return changedLines.map((line) => ({ querySelector: () => ({ textContent: line }) }));
+      const selectors = selector.split(",").map((item) => item.trim());
+      return changedLines.filter((line) => selectors.includes(line.codeSelector));
     }
   };
 }
@@ -55,7 +67,7 @@ function diffFile(id, { notice, changedLines = [], viewed = false, disabled = fa
 test("auto-marking is off until enabled and follows changes in Chrome Sync", async () => {
   const { files, scan, tick, storageChanged } = await openChangesPage();
   const rename = diffFile("diff-rename", { notice: "File renamed without changes." });
-  const imports = diffFile("diff-imports", { changedLines: ["import kotlin.time.Duration"] });
+  const imports = diffFile("diff-imports", { changedLines: [diffLine("import kotlin.time.Duration")] });
   files.push(rename, imports);
 
   tick();
@@ -77,8 +89,8 @@ test("marks at most one file per tick across both enabled options", async () => 
     autoViewImportOnly: true
   });
   const rename = diffFile("diff-rename", { notice: "File renamed without changes." });
-  const imports = diffFile("diff-imports", { changedLines: ["import kotlin.time.Duration"] });
-  const changed = diffFile("diff-changed", { changedLines: ["fun run() = 1"] });
+  const imports = diffFile("diff-imports", { changedLines: [diffLine("import kotlin.time.Duration")] });
+  const changed = diffFile("diff-changed", { changedLines: [diffLine("fun run() = 1")] });
   const viewed = diffFile("diff-viewed", { notice: "File renamed without changes.", viewed: true });
   const disabled = diffFile("diff-disabled", { notice: "File renamed without changes.", disabled: true });
   files.push(changed, viewed, disabled, rename, imports);
@@ -109,6 +121,38 @@ test("picks up newly rendered renames only on Changes and Files pages", async ()
   location.pathname = "/acme/widgets/pull/42/files";
   tick();
   assert.equal(rename.button.click.mock.callCount(), 1);
+});
+
+test("marks modern import-only diffs and ignores unchanged context", async () => {
+  const { files, tick } = await openChangesPage({ autoViewImportOnly: true });
+  const imports = diffFile("diff-imports", { changedLines: [
+    diffLine("import old", { type: "deletion", modern: true }),
+    diffLine("import replacement", { modern: true }),
+    diffLine(" ", { modern: true }),
+    diffLine("print('context')", { type: "context", modern: true })
+  ] });
+  files.push(imports);
+
+  tick();
+  assert.equal(imports.button.click.mock.callCount(), 1);
+});
+
+test("leaves modern diffs unviewed when a changed line contains code or its text is unavailable", async () => {
+  const { files, tick } = await openChangesPage({ autoViewImportOnly: true });
+  const imports = diffLine("import replacement", { modern: true });
+  const mixed = diffFile("diff-mixed", { changedLines: [
+    imports,
+    diffLine("print('changed')", { type: "deletion", modern: true })
+  ] });
+  const incomplete = diffFile("diff-incomplete", { changedLines: [
+    imports,
+    diffLine("print('changed')", { type: "deletion", modern: true, hasText: false })
+  ] });
+  files.push(mixed, incomplete);
+
+  tick();
+  assert.equal(mixed.button.click.mock.callCount(), 0);
+  assert.equal(incomplete.button.click.mock.callCount(), 0);
 });
 
 // Lays files out top to bottom and, like GitHub, renders only those near the viewport.
